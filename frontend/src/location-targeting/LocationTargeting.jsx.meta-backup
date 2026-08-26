@@ -1,0 +1,303 @@
+import { useState } from "react";
+import "./LocationTargeting.css";
+
+function LocationTargeting() {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const [selectedLocations, setSelectedLocations] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const [peopleType, setPeopleType] = useState(
+    "living"
+  );
+
+  const [radius, setRadius] = useState("10");
+
+  const searchLocations = async () => {
+    const value = query.trim();
+
+    if (value.length < 2) {
+      setError("కనీసం 2 characters type చేయండి.");
+      setResults([]);
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setResults([]);
+
+    try {
+      const response = await fetch(
+        `http://localhost:8787/api/locations/search?q=${encodeURIComponent(value)}`
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Location search failed");
+      }
+
+      setResults(data);
+    } catch (err) {
+      setError(
+        "Location search connect కాలేదు. Backend server running ఉందో check చేయండి."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const addLocation = (location) => {
+    const alreadySelected = selectedLocations.some(
+      (item) => item.id === location.id
+    );
+
+    if (alreadySelected) {
+      return;
+    }
+
+    setSelectedLocations((previous) => [
+      ...previous,
+      location
+    ]);
+
+    setResults([]);
+    setQuery("");
+  };
+
+  const removeLocation = (id) => {
+    setSelectedLocations((previous) =>
+      previous.filter((item) => item.id !== id)
+    );
+  };
+
+  return (
+    <div className="location-targeting">
+
+      <div className="location-heading">
+        <div>
+          <span className="location-eyebrow">
+            📍 LOCATION TARGETING
+          </span>
+
+          <h2>Where do you want to reach people?</h2>
+
+          <p>
+            Search and select a real location for your campaign.
+          </p>
+        </div>
+
+        <div className="location-icon">
+          📍
+        </div>
+      </div>
+
+      <div className="search-section">
+
+        <label>🔎 Search locations</label>
+
+        <div className="search-row">
+
+          <input
+            value={query}
+            onChange={(event) =>
+              setQuery(event.target.value)
+            }
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                searchLocations();
+              }
+            }}
+            placeholder="Enter city, town, area or location"
+          />
+
+          <button
+            type="button"
+            onClick={searchLocations}
+            disabled={loading}
+          >
+            {loading ? "Searching..." : "Search"}
+          </button>
+
+        </div>
+
+        {error && (
+          <div className="location-error">
+            ⚠️ {error}
+          </div>
+        )}
+
+        {results.length > 0 && (
+          <div className="location-results">
+
+            {results.map((location) => (
+              <button
+                type="button"
+                className="location-result"
+                key={location.id}
+                onClick={() => addLocation(location)}
+              >
+                <span className="result-pin">
+                  📍
+                </span>
+
+                <span className="result-content">
+                  <strong>
+                    {location.name}
+                  </strong>
+
+                  <small>
+                    {location.displayName}
+                  </small>
+                </span>
+
+                <span className="result-add">
+                  +
+                </span>
+              </button>
+            ))}
+
+          </div>
+        )}
+
+      </div>
+
+      {selectedLocations.length > 0 && (
+        <div className="selected-section">
+
+          <div className="section-title">
+            📍 Selected locations
+          </div>
+
+          {selectedLocations.map((location) => (
+            <div
+              className="selected-location"
+              key={location.id}
+            >
+              <div>
+                <strong>
+                  {location.name}
+                </strong>
+
+                <small>
+                  {location.city
+                    ? `${location.city}, ${location.state}`
+                    : location.displayName}
+                </small>
+
+                <small className="coordinates">
+                  Lat: {location.latitude.toFixed(6)}
+                  {" · "}
+                  Lon: {location.longitude.toFixed(6)}
+                </small>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  removeLocation(location.id)
+                }
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+
+        </div>
+      )}
+
+      <div className="people-section">
+
+        <div className="section-title">
+          👥 People to target
+        </div>
+
+        <label className="radio-option">
+          <input
+            type="radio"
+            name="peopleType"
+            value="living"
+            checked={peopleType === "living"}
+            onChange={(event) =>
+              setPeopleType(event.target.value)
+            }
+          />
+
+          <span>
+            <strong>People living in this location</strong>
+            <small>Recommended</small>
+          </span>
+        </label>
+
+        <label className="radio-option">
+          <input
+            type="radio"
+            name="peopleType"
+            value="recent"
+            checked={peopleType === "recent"}
+            onChange={(event) =>
+              setPeopleType(event.target.value)
+            }
+          />
+
+          <span>
+            <strong>People recently in this location</strong>
+          </span>
+        </label>
+
+        <label className="radio-option">
+          <input
+            type="radio"
+            name="peopleType"
+            value="traveling"
+            checked={peopleType === "traveling"}
+            onChange={(event) =>
+              setPeopleType(event.target.value)
+            }
+          />
+
+          <span>
+            <strong>People traveling in this location</strong>
+          </span>
+        </label>
+
+      </div>
+
+      <div className="radius-section">
+
+        <div>
+          <strong>🎯 Target radius</strong>
+
+          <small>
+            Reach people around the selected locations
+          </small>
+        </div>
+
+        <select
+          value={radius}
+          onChange={(event) =>
+            setRadius(event.target.value)
+          }
+        >
+          <option value="1">1 km</option>
+          <option value="2">2 km</option>
+          <option value="5">5 km</option>
+          <option value="10">10 km</option>
+          <option value="15">15 km</option>
+          <option value="20">20 km</option>
+          <option value="25">25 km</option>
+          <option value="50">50 km</option>
+        </select>
+
+      </div>
+
+      <div className="location-attribution">
+        Location data © OpenStreetMap contributors
+      </div>
+
+    </div>
+  );
+}
+
+export default LocationTargeting;

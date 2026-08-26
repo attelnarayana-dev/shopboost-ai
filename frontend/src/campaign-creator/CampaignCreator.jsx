@@ -1,0 +1,518 @@
+import { useState } from "react";
+import "./CampaignCreator.css";
+import LocationTargeting from "../location-targeting/LocationTargeting";
+import AudienceTargeting from "../audience-targeting/AudienceTargeting";
+
+function CampaignCreator() {
+  const [campaign, setCampaign] = useState({
+    name: "దసరా స్పెషల్ క్యాంపెయిన్",
+    platform: "Instagram + Facebook",
+    objective: "⭐ Reach + Sales — Recommended",
+    audience: "👥 New Potential Customers",
+    strategy: "⭐ Balanced — Reach + Sales",
+    budget: "₹300",
+    duration: "7 Days",
+    creative: "Latest Reel",
+  });
+
+  const [showLocation, setShowLocation] = useState(false);
+  const [status, setStatus] = useState("");
+
+  const updateCampaign = (field, value) => {
+    setCampaign((previous) => ({
+      ...previous,
+      [field]: value,
+    }));
+    setStatus("");
+  };
+
+  const budgetNumber = Number(
+    campaign.budget.replace("₹", "").replace(",", "")
+  );
+
+  const durationNumber = Number(
+    campaign.duration.replace(" Days", "")
+  );
+
+  const isSales =
+    campaign.objective.includes("Sales") ||
+    campaign.strategy.includes("Sales");
+
+  const isReach =
+    campaign.objective.includes("Reach") ||
+    campaign.strategy.includes("Reach");
+
+  const campaignScore = Math.min(
+    98,
+    72 +
+      (campaign.objective.includes("Recommended") ? 8 : 0) +
+      (campaign.strategy.includes("Balanced") ? 7 : 0) +
+      (budgetNumber >= 300 ? 5 : 0) +
+      (durationNumber >= 7 ? 4 : 0) +
+      (campaign.audience.includes("New") ? 2 : 0)
+  );
+
+  const estimatedReachMin = Math.round(
+    budgetNumber * durationNumber * (isSales ? 10 : 14)
+  );
+
+  const estimatedReachMax = Math.round(
+    estimatedReachMin * (isSales ? 2.1 : 2.6)
+  );
+
+  const estimatedImpressionsMin = Math.round(
+    estimatedReachMin * 1.35
+  );
+
+  const estimatedImpressionsMax = Math.round(
+    estimatedReachMax * 1.55
+  );
+
+  const totalBudget = budgetNumber * durationNumber;
+
+  const aiRecommendation =
+    campaign.objective.includes("Sales")
+      ? "🛒 Sales-focused setup detected. Keep your creative offer clear and use a strong WhatsApp / purchase CTA."
+      : campaign.objective.includes("Reach")
+      ? "🚀 Reach-focused setup detected. A wider audience and longer duration can help increase discovery."
+      : campaign.strategy.includes("Local")
+      ? "📍 Local strategy detected. Focus your radius around your highest-value customer areas."
+      : "⭐ Balanced setup looks strong. Your campaign is designed to combine discovery with conversion potential.";
+
+  const launchCampaign = () => {
+    setStatus(
+      "🚀 Campaign Ready! Meta connection is required before the real campaign can be launched."
+    );
+  };
+
+  const resetCampaign = () => {
+    setCampaign({
+      name: "దసరా స్పెషల్ క్యాంపెయిన్",
+      platform: "Instagram + Facebook",
+      objective: "⭐ Reach + Sales — Recommended",
+      audience: "👥 New Potential Customers",
+      strategy: "⭐ Balanced — Reach + Sales",
+      budget: "₹300",
+      duration: "7 Days",
+      creative: "Latest Reel",
+    });
+
+    setShowLocation(false);
+    setStatus("");
+  };
+
+  return (
+    <div className="campaign-page">
+      <div className="campaign-container">
+
+        <div className="campaign-header">
+          <div>
+            <span>📢 CAMPAIGN CREATOR</span>
+
+            <h1>మీ Ad Campaign తయారు చేయండి</h1>
+
+            <p>
+              Reach, Sales, Audience మరియు AI Strategyని ఒకే చోట సెట్ చేయండి.
+            </p>
+          </div>
+
+          <div className="campaign-status">
+            <span className="status-dot"></span>
+            Campaign Draft
+          </div>
+        </div>
+
+        <div className="campaign-layout">
+
+          <div className="campaign-form">
+
+            <div className="form-card">
+              <h2>⚙️ Campaign Details</h2>
+
+              <div className="form-grid">
+
+                <div className="form-field full">
+                  <label>📢 Campaign Name</label>
+
+                  <input
+                    value={campaign.name}
+                    onChange={(event) =>
+                      updateCampaign("name", event.target.value)
+                    }
+                  />
+                </div>
+
+                <div className="form-field">
+                  <label>📱 Platform</label>
+
+                  <select
+                    value={campaign.platform}
+                    onChange={(event) =>
+                      updateCampaign("platform", event.target.value)
+                    }
+                  >
+                    <option>Instagram + Facebook</option>
+                    <option>Instagram Only</option>
+                    <option>Facebook Only</option>
+                  </select>
+                </div>
+
+                <div className="form-field">
+                  <label>🎯 Campaign Goal</label>
+
+                  <select
+                    value={campaign.objective}
+                    onChange={(event) =>
+                      updateCampaign("objective", event.target.value)
+                    }
+                  >
+                    <option>🚀 Maximum Reach</option>
+                    <option>👀 More Video Views</option>
+                    <option>❤️ More Engagement</option>
+                    <option>💬 More Messages / WhatsApp</option>
+                    <option>🛒 More Sales</option>
+                    <option>👥 New Customers</option>
+                    <option>🔄 Repeat Customers</option>
+                    <option>⭐ Reach + Sales — Recommended</option>
+                  </select>
+                </div>
+                
+                <div className="form-field full">
+                  <label>👥 Target Audience</label>
+
+                  <select
+                    value={campaign.audience}
+                    onChange={(event) =>
+                      updateCampaign("audience", event.target.value)
+                    }
+                  >
+                    <option>📍 Nearby Customers</option>
+                    <option>👀 Reel Viewers</option>
+                    <option>❤️ People Who Engaged</option>
+                    <option>🛒 Previous Customers</option>
+                    <option>👥 New Potential Customers</option>
+                    <option>🔄 Retargeting Audience</option>
+                  </select>
+                </div>
+                
+                <div className="audience-integration-card">
+
+  <div className="audience-integration-header">
+    <div>
+      <span>👥 AUDIENCE TARGETING</span>
+
+      <h2>మీ Ad ఎవరికి చూపించాలి?</h2>
+
+      <p>
+        మీ campaign కోసం సరైన customersని target చేయండి.
+      </p>
+    </div>
+  </div>
+
+  <div className="audience-component-wrapper">
+    <AudienceTargeting />
+  </div>
+
+</div>
+                <div className="form-field full ai-strategy-field">
+                  <label>🧠 AI Campaign Strategy</label>
+
+                  <select
+                    value={campaign.strategy}
+                    onChange={(event) =>
+                      updateCampaign("strategy", event.target.value)
+                    }
+                  >
+                    <option>🚀 Reach Booster</option>
+                    <option>🛒 Sales Booster</option>
+                    <option>⭐ Balanced — Reach + Sales</option>
+                    <option>📍 Local Customer Booster</option>
+                    <option>🔄 Retargeting Booster</option>
+                  </select>
+
+                  <small>
+                    AI మీ Campaign Goal మరియు Audience ఆధారంగా సరైన strategyని
+                    recommend చేస్తుంది.
+                  </small>
+                </div>
+
+              </div>
+            </div>
+
+            <div className="location-integration-card">
+
+              <div className="location-integration-header">
+
+                <div>
+                  <span>📍 LOCATION</span>
+
+                  <h2>Ad ఎక్కడ చూపించాలి?</h2>
+
+                  <p>
+                    మీ campaign కోసం locations మరియు target radius select చేయండి.
+                  </p>
+                </div>
+
+                <button
+                  className="location-toggle-button"
+                  onClick={() => setShowLocation((previous) => !previous)}
+                >
+                  {showLocation
+                    ? "▲ Hide Location"
+                    : "📍 Select Location"}
+                </button>
+
+              </div>
+
+              {showLocation ? (
+                <div className="location-component-wrapper">
+                  <LocationTargeting />
+                </div>
+              ) : (
+                <button
+                  className="location-open-card"
+                  onClick={() => setShowLocation(true)}
+                >
+                  <span className="location-open-icon">📍</span>
+
+                  <span>
+                    <strong>Location Targeting</strong>
+
+                    <small>
+                      City, area, radius మరియు people targeting సెట్ చేయండి
+                    </small>
+                  </span>
+
+                  <span className="location-arrow">→</span>
+                </button>
+              )}
+
+            </div>
+
+            <div className="form-card">
+
+              <h2>💰 Budget & Schedule</h2>
+
+              <div className="form-grid">
+
+                <div className="form-field">
+                  <label>💰 Daily Budget</label>
+
+                  <select
+                    value={campaign.budget}
+                    onChange={(event) =>
+                      updateCampaign("budget", event.target.value)
+                    }
+                  >
+                    <option>₹100</option>
+                    <option>₹200</option>
+                    <option>₹300</option>
+                    <option>₹500</option>
+                    <option>₹1000</option>
+                  </select>
+                </div>
+
+                <div className="form-field">
+                  <label>📅 Campaign Duration</label>
+
+                  <select
+                    value={campaign.duration}
+                    onChange={(event) =>
+                      updateCampaign("duration", event.target.value)
+                    }
+                  >
+                    <option>3 Days</option>
+                    <option>7 Days</option>
+                    <option>14 Days</option>
+                    <option>30 Days</option>
+                  </select>
+                </div>
+
+                <div className="form-field full">
+                  <label>🎬 Creative</label>
+
+                  <select
+                    value={campaign.creative}
+                    onChange={(event) =>
+                      updateCampaign("creative", event.target.value)
+                    }
+                  >
+                    <option>Latest Reel</option>
+                    <option>Offer Poster</option>
+                    <option>Latest Reel + Poster</option>
+                  </select>
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+
+          <div className="campaign-preview">
+
+            <div className="preview-card">
+
+              <div className="preview-header">
+                <span>👀 CAMPAIGN PREVIEW</span>
+                <span className="draft-badge">DRAFT</span>
+              </div>
+
+              <div className="preview-creative">
+                <div className="creative-icon">🎬</div>
+
+                <strong>{campaign.creative}</strong>
+
+                <span>{campaign.platform}</span>
+              </div>
+
+              <div className="preview-details">
+
+                <div>
+                  <span>🎯 Goal</span>
+                  <strong>{campaign.objective}</strong>
+                </div>
+
+                <div>
+                  <span>👥 Audience</span>
+                  <strong>{campaign.audience}</strong>
+                </div>
+
+                <div className="strategy-preview">
+                  <span>🧠 AI Strategy</span>
+                  <strong>{campaign.strategy}</strong>
+                </div>
+
+                <div>
+                  <span>💰 Daily Budget</span>
+                  <strong>{campaign.budget}</strong>
+                </div>
+
+                <div>
+                  <span>📅 Duration</span>
+                  <strong>{campaign.duration}</strong>
+                </div>
+
+              </div>
+
+              <div className="campaign-intelligence">
+
+                <div className="intelligence-heading">
+                  <div>
+                    <span>🧠 AI CAMPAIGN INTELLIGENCE</span>
+                    <h3>Campaign Health</h3>
+                  </div>
+
+                  <div className="campaign-score">
+                    <strong>{campaignScore}</strong>
+                    <span>/100</span>
+                  </div>
+                </div>
+
+                <div className="score-bar">
+                  <div
+                    style={{
+                      width: `${campaignScore}%`,
+                    }}
+                  />
+                </div>
+
+                <div className="intelligence-metrics">
+
+                  <div className="intelligence-metric">
+                    <span>👥 Estimated Reach</span>
+                    <strong>
+                      {estimatedReachMin.toLocaleString("en-IN")} –{" "}
+                      {estimatedReachMax.toLocaleString("en-IN")}
+                    </strong>
+                  </div>
+
+                  <div className="intelligence-metric">
+                    <span>👀 Estimated Impressions</span>
+                    <strong>
+                      {estimatedImpressionsMin.toLocaleString("en-IN")} –{" "}
+                      {estimatedImpressionsMax.toLocaleString("en-IN")}
+                    </strong>
+                  </div>
+
+                  <div className="intelligence-metric">
+                    <span>💰 Total Budget</span>
+                    <strong>
+                      ₹{totalBudget.toLocaleString("en-IN")}
+                    </strong>
+                  </div>
+
+                  <div className="intelligence-metric">
+                    <span>🎯 Optimization</span>
+                    <strong>
+                      {isSales
+                        ? "Sales"
+                        : isReach
+                        ? "Reach"
+                        : "Balanced"}
+                    </strong>
+                  </div>
+
+                </div>
+
+                <div className="ai-recommendation">
+                  <span>✨ AI Recommendation</span>
+                  <p>{aiRecommendation}</p>
+                </div>
+
+                <small className="estimate-disclaimer">
+                  Estimated values for planning only. Real delivery estimates
+                  will be available after Meta Ads connection.
+                </small>
+
+              </div>
+
+              <div className="estimated-budget">
+                <span>Estimated Campaign Budget</span>
+
+                <strong>
+                  {campaign.budget === "₹100"
+                    ? "₹300 - ₹700"
+                    : campaign.budget === "₹200"
+                    ? "₹600 - ₹1,400"
+                    : campaign.budget === "₹300"
+                    ? "₹900 - ₹2,100"
+                    : campaign.budget === "₹500"
+                    ? "₹1,500 - ₹3,500"
+                    : "₹3,000 - ₹7,000"}
+                </strong>
+              </div>
+
+              <div className="campaign-actions">
+
+                <button
+                  className="reset-button"
+                  onClick={resetCampaign}
+                >
+                  ↩️ Reset
+                </button>
+
+                <button
+                  className="launch-button"
+                  onClick={launchCampaign}
+                >
+                  🚀 Prepare Campaign
+                </button>
+
+              </div>
+
+              {status && (
+                <div className="campaign-message">
+                  {status}
+                </div>
+              )}
+
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default CampaignCreator;

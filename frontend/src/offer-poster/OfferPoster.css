@@ -1,0 +1,226 @@
+.offer-poster-page {
+  min-height: 100vh;
+  background: #f5f6fb;
+  padding: 40px 20px;
+  box-sizing: border-box;
+}
+
+.offer-poster-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.poster-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.poster-header span {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.poster-header h1 {
+  margin: 10px 0;
+  font-size: 34px;
+}
+
+.poster-header p {
+  color: #777;
+  margin: 0;
+}
+
+.poster-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  align-items: start;
+}
+
+.poster-preview-section,
+.poster-edit-section {
+  background: white;
+  border-radius: 22px;
+  padding: 24px;
+  box-sizing: border-box;
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.06);
+}
+
+.poster-preview-section h3,
+.poster-edit-section h3 {
+  margin-top: 0;
+  margin-bottom: 20px;
+}
+
+/* POSTER */
+
+.poster-card {
+  width: 100%;
+  max-width: 430px;
+  min-height: 600px;
+  margin: 0 auto;
+  padding: 35px 25px;
+  box-sizing: border-box;
+  border-radius: 20px;
+  background: linear-gradient(
+    145deg,
+    #171827,
+    #30206b,
+    #5d3fd3
+  );
+  color: white;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.poster-top-label {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  margin-bottom: 20px;
+}
+
+.poster-offer-name {
+  font-size: 32px;
+  font-weight: 900;
+  margin-bottom: 25px;
+}
+
+.poster-discount {
+  font-size: 68px;
+  line-height: 1;
+  font-weight: 950;
+}
+
+.poster-discount-text {
+  font-size: 17px;
+  margin-top: 8px;
+  margin-bottom: 28px;
+}
+
+.poster-info {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 25px;
+}
+
+.poster-info div {
+  padding: 13px 6px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.poster-info span {
+  display: block;
+  margin-bottom: 5px;
+}
+
+.poster-info strong {
+  font-size: 14px;
+}
+
+.poster-description {
+  font-size: 14px;
+  line-height: 1.6;
+  max-width: 340px;
+  margin-bottom: 28px;
+}
+
+.poster-button {
+  padding: 13px 35px;
+  border-radius: 30px;
+  background: white;
+  color: #39257d;
+  font-weight: 900;
+  margin-bottom: 20px;
+}
+
+.poster-footer {
+  font-size: 10px;
+  letter-spacing: 2px;
+  opacity: 0.7;
+}
+
+/* EDIT PANEL */
+
+.poster-field {
+  margin-bottom: 16px;
+}
+
+.poster-field label {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.poster-field input,
+.poster-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #dedfe7;
+  border-radius: 11px;
+  padding: 12px;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+}
+
+.poster-field input:focus,
+.poster-field textarea:focus {
+  border-color: #6c55dc;
+}
+
+.poster-field textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+
+.poster-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.poster-actions button {
+  flex: 1;
+  border: 0;
+  border-radius: 12px;
+  padding: 13px;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.reset-poster-button {
+  background: #eeeeF4;
+}
+
+.prepare-poster-button {
+  background: #6c55dc;
+  color: white;
+}
+
+.poster-status {
+  margin-top: 16px;
+  padding: 13px;
+  border-radius: 12px;
+  background: #eefbf3;
+  text-align: center;
+  font-weight: 700;
+}
+
+@media (max-width: 800px) {
+  .poster-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .poster-card {
+    max-width: 100%;
+  }
+}

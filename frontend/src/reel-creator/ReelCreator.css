@@ -1,0 +1,234 @@
+.reel-creator-page {
+  min-height: 100vh;
+  background: #f5f6fb;
+  padding: 40px 20px;
+  box-sizing: border-box;
+}
+
+.reel-creator-container {
+  max-width: 1150px;
+  margin: 0 auto;
+}
+
+.reel-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.reel-header span {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.reel-header h1 {
+  margin: 10px 0;
+  font-size: 34px;
+}
+
+.reel-header p {
+  margin: 0;
+  color: #777;
+}
+
+.reel-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  align-items: start;
+}
+
+.reel-preview-section,
+.reel-settings-section {
+  background: white;
+  border-radius: 22px;
+  padding: 24px;
+  box-sizing: border-box;
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.06);
+}
+
+.reel-preview-section h3,
+.reel-settings-section h3 {
+  margin-top: 0;
+  margin-bottom: 20px;
+}
+
+/* PHONE */
+
+.phone-frame {
+  width: 320px;
+  height: 620px;
+  margin: 0 auto;
+  padding: 10px;
+  border-radius: 38px;
+  background: #111;
+  box-sizing: border-box;
+}
+
+.reel-screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 30px;
+  background: linear-gradient(
+    160deg,
+    #171827,
+    #342276,
+    #6543dc
+  );
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 25px;
+  box-sizing: border-box;
+}
+
+.reel-glow {
+  position: absolute;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  top: -70px;
+  right: -70px;
+}
+
+.reel-top-text {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  margin-bottom: 25px;
+  z-index: 1;
+}
+
+.reel-title {
+  font-size: 27px;
+  font-weight: 900;
+  line-height: 1.25;
+  z-index: 1;
+  margin-bottom: 25px;
+}
+
+.reel-discount {
+  font-size: 58px;
+  font-weight: 950;
+  line-height: 1;
+  z-index: 1;
+}
+
+.reel-category {
+  margin-top: 12px;
+  font-size: 15px;
+  z-index: 1;
+}
+
+.reel-price {
+  font-size: 25px;
+  font-weight: 900;
+  margin-top: 20px;
+  z-index: 1;
+}
+
+.reel-duration {
+  margin-top: 10px;
+  font-size: 13px;
+  z-index: 1;
+}
+
+.reel-cta {
+  margin-top: 35px;
+  padding: 12px 22px;
+  background: white;
+  color: #39257d;
+  border-radius: 25px;
+  font-weight: 900;
+  font-size: 13px;
+  z-index: 1;
+}
+
+.reel-instagram {
+  position: absolute;
+  bottom: 18px;
+  font-size: 9px;
+  letter-spacing: 1px;
+  opacity: 0.7;
+}
+
+/* SETTINGS */
+
+.reel-field {
+  margin-bottom: 15px;
+}
+
+.reel-field label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 7px;
+}
+
+.reel-field input,
+.reel-field select {
+  width: 100%;
+  padding: 12px;
+  box-sizing: border-box;
+  border: 1px solid #dedfe7;
+  border-radius: 11px;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  background: white;
+}
+
+.reel-field input:focus,
+.reel-field select:focus {
+  border-color: #6c55dc;
+}
+
+.reel-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.reel-actions button {
+  flex: 1;
+  border: 0;
+  padding: 13px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.reset-reel-button {
+  background: #eeeeF4;
+}
+
+.create-reel-button {
+  background: #6c55dc;
+  color: white;
+}
+
+.reel-status {
+  margin-top: 16px;
+  padding: 13px;
+  border-radius: 12px;
+  background: #eefbf3;
+  text-align: center;
+  font-weight: 700;
+}
+
+@media (max-width: 800px) {
+  .reel-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .phone-frame {
+    width: 300px;
+    height: 580px;
+  }
+}

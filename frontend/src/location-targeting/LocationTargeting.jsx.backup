@@ -1,0 +1,351 @@
+import { useState } from "react";
+import "./LocationTargeting.css";
+
+function LocationTargeting() {
+  const [search, setSearch] = useState("");
+  const [radius, setRadius] = useState("10 km");
+  const [searching, setSearching] = useState(false);
+
+  const [locations, setLocations] = useState([]);
+
+  const demoSearchResults = [
+    {
+      id: 1,
+      name: "Kukatpally",
+      subtitle: "Hyderabad, Telangana, India",
+    },
+    {
+      id: 2,
+      name: "Madhapur",
+      subtitle: "Hyderabad, Telangana, India",
+    },
+    {
+      id: 3,
+      name: "Gachibowli",
+      subtitle: "Hyderabad, Telangana, India",
+    },
+    {
+      id: 4,
+      name: "Ameerpet",
+      subtitle: "Hyderabad, Telangana, India",
+    },
+    {
+      id: 5,
+      name: "LB Nagar",
+      subtitle: "Hyderabad, Telangana, India",
+    },
+    {
+      id: 6,
+      name: "Benz Circle",
+      subtitle: "Vijayawada, Andhra Pradesh, India",
+    },
+  ];
+
+  const filteredResults = demoSearchResults.filter((location) =>
+    `${location.name} ${location.subtitle}`
+      .toLowerCase()
+      .includes(search.trim().toLowerCase())
+  );
+
+  const handleSearch = (event) => {
+    const value = event.target.value;
+
+    setSearch(value);
+
+    if (!value.trim()) {
+      setSearching(false);
+      return;
+    }
+
+    setSearching(true);
+  };
+
+  const addLocation = (location) => {
+    const exists = locations.some(
+      (item) =>
+        item.name === location.name &&
+        item.subtitle === location.subtitle
+    );
+
+    if (!exists) {
+      setLocations((previous) => [
+        ...previous,
+        {
+          ...location,
+          latitude: null,
+          longitude: null,
+        },
+      ]);
+    }
+
+    setSearch("");
+    setSearching(false);
+  };
+
+  const removeLocation = (id) => {
+    setLocations((previous) =>
+      previous.filter((location) => location.id !== id)
+    );
+  };
+
+  return (
+    <div className="location-targeting">
+
+      <div className="location-card">
+
+        <div className="location-heading">
+          <div>
+            <span>📍 LOCATION TARGETING</span>
+
+            <h2>Where do you want to reach people?</h2>
+
+            <p>
+              Search for a city, area, town or local location.
+            </p>
+          </div>
+
+          <div className="location-icon">
+            📍
+          </div>
+        </div>
+
+        <div className="location-search-section">
+
+          <label>🔎 Search locations</label>
+
+          <div className="location-search-box">
+
+            <span>🔎</span>
+
+            <input
+              type="text"
+              placeholder="Search city, area, town or location"
+              value={search}
+              onChange={handleSearch}
+            />
+
+            {search && (
+              <button
+                className="clear-search"
+                onClick={() => {
+                  setSearch("");
+                  setSearching(false);
+                }}
+              >
+                ✕
+              </button>
+            )}
+
+          </div>
+
+          {searching && (
+            <div className="location-suggestions">
+
+              {filteredResults.length > 0 ? (
+                filteredResults.map((location) => (
+                  <button
+                    key={location.id}
+                    className="location-suggestion"
+                    onClick={() => addLocation(location)}
+                  >
+                    <span className="suggestion-pin">
+                      📍
+                    </span>
+
+                    <span className="suggestion-details">
+                      <strong>{location.name}</strong>
+                      <small>{location.subtitle}</small>
+                    </span>
+
+                    <span className="add-icon">
+                      ＋
+                    </span>
+                  </button>
+                ))
+              ) : (
+                <div className="no-results">
+
+                  <span>🔎</span>
+
+                  <strong>No location found</strong>
+
+                  <small>
+                    Real location search will be connected next.
+                  </small>
+
+                </div>
+              )}
+
+            </div>
+          )}
+
+        </div>
+
+        <div className="selected-section">
+
+          <div className="section-title">
+            <strong>Selected locations</strong>
+
+            <span>
+              {locations.length} location
+              {locations.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+
+          <div className="selected-locations">
+
+            {locations.length === 0 ? (
+              <div className="empty-location">
+                📍 Search and select a location above
+              </div>
+            ) : (
+              locations.map((location) => (
+                <div
+                  className="selected-location"
+                  key={location.id}
+                >
+                  <div className="selected-location-icon">
+                    📍
+                  </div>
+
+                  <div className="selected-location-info">
+
+                    <strong>{location.name}</strong>
+
+                    <span>{location.subtitle}</span>
+
+                    <small>
+                      🎯 Radius: {radius}
+                    </small>
+
+                  </div>
+
+                  <button
+                    onClick={() =>
+                      removeLocation(location.id)
+                    }
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))
+            )}
+
+          </div>
+
+        </div>
+
+        <div className="target-options">
+
+          <div className="option-title">
+            👥 People to target
+          </div>
+
+          <label className="radio-option">
+
+            <input
+              type="radio"
+              name="people"
+              defaultChecked
+            />
+
+            <span className="custom-radio"></span>
+
+            <span>
+              <strong>People living in this location</strong>
+              <small>Recommended</small>
+            </span>
+
+          </label>
+
+          <label className="radio-option">
+
+            <input
+              type="radio"
+              name="people"
+            />
+
+            <span className="custom-radio"></span>
+
+            <span>
+              <strong>People recently in this location</strong>
+            </span>
+
+          </label>
+
+          <label className="radio-option">
+
+            <input
+              type="radio"
+              name="people"
+            />
+
+            <span className="custom-radio"></span>
+
+            <span>
+              <strong>People traveling in this location</strong>
+            </span>
+
+          </label>
+
+        </div>
+
+        <div className="radius-section">
+
+          <div>
+            <strong>🎯 Target radius</strong>
+
+            <small>
+              Reach people around the selected locations
+            </small>
+          </div>
+
+          <select
+            value={radius}
+            onChange={(event) =>
+              setRadius(event.target.value)
+            }
+          >
+            <option>1 km</option>
+            <option>5 km</option>
+            <option>10 km</option>
+            <option>15 km</option>
+            <option>25 km</option>
+            <option>50 km</option>
+          </select>
+
+        </div>
+
+        <div className="map-preview">
+
+          <div className="map-grid"></div>
+
+          <div className="map-radius">
+            <span className="map-pin">
+              📍
+            </span>
+          </div>
+
+          <div className="map-label">
+
+            <strong>
+              {locations.length > 0
+                ? locations[0].name
+                : "Select a location"}
+            </strong>
+
+            <span>
+              {radius} radius
+            </span>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+  );
+}
+
+export default LocationTargeting;

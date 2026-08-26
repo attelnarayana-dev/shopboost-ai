@@ -1,0 +1,180 @@
+.voice-input-page {
+  min-height: 100vh;
+  background: #f6f7fb;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 30px;
+  font-family: Arial, "Noto Sans Telugu", sans-serif;
+}
+
+.voice-card {
+  width: 100%;
+  max-width: 650px;
+  background: white;
+  border: 1px solid #e7e8ef;
+  border-radius: 28px;
+  padding: 42px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
+}
+
+.voice-badge {
+  display: inline-block;
+  padding: 8px 14px;
+  border-radius: 30px;
+  background: #eeeaff;
+  color: #5d4bdc;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.voice-header h1 {
+  margin: 18px 0 10px;
+  font-size: 29px;
+  color: #171923;
+}
+
+.voice-header p {
+  margin: 0 auto;
+  max-width: 500px;
+  color: #777b89;
+  line-height: 1.7;
+  font-size: 14px;
+}
+
+.mic-button {
+  width: 105px;
+  height: 105px;
+  margin: 35px auto 18px;
+  border: none;
+  border-radius: 50%;
+  background: #7161e8;
+  color: white;
+  font-size: 40px;
+  cursor: pointer;
+  box-shadow: 0 15px 35px rgba(113, 97, 232, 0.3);
+  transition: 0.2s;
+}
+
+.mic-button:hover {
+  transform: scale(1.05);
+}
+
+.mic-button.listening {
+  background: #e85d75;
+  animation: pulse 1.2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(232, 93, 117, 0.45);
+  }
+
+  70% {
+    box-shadow: 0 0 0 25px rgba(232, 93, 117, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(232, 93, 117, 0);
+  }
+}
+
+.voice-status {
+  color: #666a78;
+  font-size: 13px;
+  margin-bottom: 25px;
+}
+
+.text-box {
+  position: relative;
+  text-align: left;
+}
+
+.text-box label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.text-box textarea {
+  width: 100%;
+  min-height: 150px;
+  resize: vertical;
+  border: 1px solid #dedfe7;
+  border-radius: 15px;
+  padding: 16px;
+  outline: none;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.text-box textarea:focus {
+  border-color: #7161e8;
+}
+
+.clear-button {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  border: none;
+  background: #f0f0f4;
+  color: #555967;
+  padding: 7px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.example-box {
+  margin-top: 18px;
+  padding: 16px;
+  border-radius: 14px;
+  background: #f8f8fc;
+  text-align: left;
+}
+
+.example-box strong {
+  font-size: 12px;
+}
+
+.example-box p {
+  margin: 8px 0 0;
+  color: #707482;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.continue-button {
+  width: 100%;
+  margin-top: 22px;
+  border: none;
+  padding: 14px;
+  border-radius: 12px;
+  background: #7161e8;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.continue-button:disabled {
+  background: #d6d7df;
+  cursor: not-allowed;
+}
+
+@media (max-width: 600px) {
+  .voice-input-page {
+    padding: 15px;
+  }
+
+  .voice-card {
+    padding: 28px 20px;
+  }
+
+  .voice-header h1 {
+    font-size: 23px;
+  }
+}

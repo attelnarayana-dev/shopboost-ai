@@ -74,6 +74,187 @@ async function getMetaUser(accessToken) {
   return data;
 }
 
+async function metaGraphRequest(path, accessToken) {
+  const response = await fetch(
+    `https://graph.facebook.com/v25.0${path}`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok || data.error) {
+    throw new Error(
+      data.error?.message ||
+        "Meta Graph API request failed"
+    );
+  }
+
+  return data;
+}
+
+async function getMetaAssets(connectionId) {
+  if (!supabase) {
+    throw new Error(
+      "Supabase environment variables are missing"
+    );
+  }
+
+  // Get the customer's stored Meta token
+  const { data: connection, error } =
+    await supabase
+      .from("meta_connections")
+      .select(
+        "id, customer_id, meta_user_id, access_token"
+      )
+      .eq("id", connectionId)
+      .single();
+
+  if (error || !connection) {
+    throw new Error(
+      "Meta connection was not found"
+    );
+  }
+
+  const accessToken =
+    connection.access_token;
+
+  // ==========================================
+  // BUSINESSES
+  // ==========================================
+
+  const businesses =
+    await metaGraphRequest(
+      `/me/businesses?fields=id,name&limit=100`,
+      accessToken
+    );
+
+  // ==========================================
+  // AD ACCOUNTS
+  // ==========================================
+
+  const adAccounts =
+    await metaGraphRequest(
+      
+`/me/adaccounts?fields=id,name,account_status,currency,account_id&limit=100`,
+      accessToken
+    );
+
+  // ==========================================
+  // FACEBOOK PAGES
+  // ==========================================
+
+  const pages =
+    await metaGraphRequest(
+      `/me/accounts?fields=id,name,access_token&limit=100`,
+      accessToken
+    );
+
+  // ==========================================
+  // SAVE BUSINESSES
+  // ==========================================
+
+  for (const business of businesses.data || []) {
+    const { error } = await supabase
+      .from("meta_businesses")
+      .upsert(
+        {
+          meta_connection_id:
+            connection.id,
+          business_id:
+            business.id,
+          business_name:
+            business.name || null
+        },
+        {
+          onConflict:
+            "meta_connection_id,business_id"
+        }
+      );
+
+    if (error) {
+      console.error(
+        "Business save error:",
+        error
+      );
+    }
+  }
+
+  // ==========================================
+  // SAVE AD ACCOUNTS
+  // ==========================================
+
+  for (const account of adAccounts.data || []) {
+    const { error } = await supabase
+      .from("meta_ad_accounts")
+      .upsert(
+        {
+          meta_connection_id:
+            connection.id,
+          ad_account_id:
+            account.id,
+          ad_account_name:
+            account.name || null
+        },
+        {
+          onConflict:
+            "meta_connection_id,ad_account_id"
+        }
+      );
+
+    if (error) {
+      console.error(
+        "Ad account save error:",
+        error
+      );
+    }
+  }
+
+  // ==========================================
+  // SAVE FACEBOOK PAGES
+  // ==========================================
+
+  for (const page of pages.data || []) {
+    const { error } = await supabase
+      .from("meta_pages")
+      .upsert(
+        {
+          meta_connection_id:
+            connection.id,
+          page_id:
+            page.id,
+          page_name:
+            page.name || null
+        },
+        {
+          onConflict:
+            "meta_connection_id,page_id"
+        }
+      );
+
+    if (error) {
+      console.error(
+        "Page save error:",
+        error
+      );
+    }
+  }
+
+  return {
+    businesses:
+      businesses.data || [],
+
+    adAccounts:
+      adAccounts.data || [],
+
+    pages:
+      pages.data || []
+  };
+}
+
 async function saveMetaConnection({
   metaUser,
   accessToken,
@@ -297,6 +478,28 @@ const server = http.createServer(
           "✅ Meta connection saved:",
           connectionId
         );
+
+        // Sync Meta business, ad account and Facebook Page assets.
+        // Instagram is intentionally not included here.
+        try {
+          const metaAssets =
+            await getMetaAssets(connectionId);
+
+          console.log(
+            "✅ Meta assets synced:",
+            "Businesses:",
+            metaAssets.businesses.length,
+            "Ad Accounts:",
+            metaAssets.adAccounts.length,
+            "Facebook Pages:",
+            metaAssets.pages.length
+          );
+        } catch (assetError) {
+          console.error(
+            "❌ Meta asset sync failed:",
+            assetError
+          );
+        }
 
         res.writeHead(200);
 

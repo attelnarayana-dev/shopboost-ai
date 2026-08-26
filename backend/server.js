@@ -10,6 +10,7 @@ const SUPABASE_SERVICE_ROLE_KEY =
 
 const META_APP_ID = process.env.META_APP_ID;
 const META_APP_SECRET = process.env.META_APP_SECRET;
+
 const META_REDIRECT_URI =
   process.env.META_REDIRECT_URI ||
   "https://shopboost-ai-backend.onrender.com/auth/meta/callback";
@@ -24,55 +25,9 @@ const supabase =
 
 let lastSearchTime = 0;
 
-async function exchangeMetaCode(code) {
-  const tokenUrl =
-    "https://graph.facebook.com/v25.0/oauth/access_token?" +
-    new URLSearchParams({
-      client_id: META_APP_ID,
-      client_secret: META_APP_SECRET,
-      redirect_uri: META_REDIRECT_URI,
-      code
-    });
-
-  const response = await fetch(tokenUrl);
-
-  const data = await response.json();
-
-  if (!response.ok || data.error) {
-    console.error("Meta token exchange failed:", data);
-
-    throw new Error(
-      data.error?.message ||
-        "Unable to exchange Meta authorization code"
-    );
-  }
-
-  return data;
-}
-
-async function getMetaUser(accessToken) {
-  const response = await fetch(
-    "https://graph.facebook.com/v25.0/me?fields=id,name",
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      }
-    }
-  );
-
-  const data = await response.json();
-
-  if (!response.ok || data.error) {
-    console.error("Meta user request failed:", data);
-
-    throw new Error(
-      data.error?.message ||
-        "Unable to retrieve Meta user"
-    );
-  }
-
-  return data;
-}
+/* =========================================================
+   META GRAPH API
+========================================================= */
 
 async function metaGraphRequest(path, accessToken) {
   const response = await fetch(
@@ -87,6 +42,11 @@ async function metaGraphRequest(path, accessToken) {
   const data = await response.json();
 
   if (!response.ok || data.error) {
+    console.error("Meta Graph API error:", {
+      path,
+      error: data.error || data
+    });
+
     throw new Error(
       data.error?.message ||
         "Meta Graph API request failed"
@@ -96,164 +56,61 @@ async function metaGraphRequest(path, accessToken) {
   return data;
 }
 
-async function getMetaAssets(connectionId) {
-  if (!supabase) {
+/* =========================================================
+   EXCHANGE META AUTHORIZATION CODE
+========================================================= */
+
+async function exchangeMetaCode(code) {
+  if (!META_APP_ID || !META_APP_SECRET) {
     throw new Error(
-      "Supabase environment variables are missing"
+      "META_APP_ID or META_APP_SECRET is missing"
     );
   }
 
-  // Get the customer's stored Meta token
-  const { data: connection, error } =
-    await supabase
-      .from("meta_connections")
-      .select(
-        "id, customer_id, meta_user_id, access_token"
-      )
-      .eq("id", connectionId)
-      .single();
+  const tokenUrl =
+    "https://graph.facebook.com/v25.0/oauth/access_token?" +
+    new URLSearchParams({
+      client_id: META_APP_ID,
+      client_secret: META_APP_SECRET,
+      redirect_uri: META_REDIRECT_URI,
+      code
+    });
 
-  if (error || !connection) {
+  const response = await fetch(tokenUrl);
+
+  const data = await response.json();
+
+  if (!response.ok || data.error) {
+    console.error(
+      "Meta token exchange failed:",
+      data
+    );
+
     throw new Error(
-      "Meta connection was not found"
+      data.error?.message ||
+        "Unable to exchange Meta authorization code"
     );
   }
 
-  const accessToken =
-    connection.access_token;
-
-  // ==========================================
-  // BUSINESSES
-  // ==========================================
-
-  const businesses =
-    await metaGraphRequest(
-      `/me/businesses?fields=id,name&limit=100`,
-      accessToken
-    );
-
-  // ==========================================
-  // AD ACCOUNTS
-  // ==========================================
-
-  const adAccounts =
-    await metaGraphRequest(
-      
-`/me/adaccounts?fields=id,name,account_status,currency,account_id&limit=100`,
-      accessToken
-    );
-
-  // ==========================================
-  // FACEBOOK PAGES
-  // ==========================================
-
-  const pages =
-    await metaGraphRequest(
-      `/me/accounts?fields=id,name,access_token&limit=100`,
-      accessToken
-    );
-
-  // ==========================================
-  // SAVE BUSINESSES
-  // ==========================================
-
-  for (const business of businesses.data || []) {
-    const { error } = await supabase
-      .from("meta_businesses")
-      .upsert(
-        {
-          meta_connection_id:
-            connection.id,
-          business_id:
-            business.id,
-          business_name:
-            business.name || null
-        },
-        {
-          onConflict:
-            "meta_connection_id,business_id"
-        }
-      );
-
-    if (error) {
-      console.error(
-        "Business save error:",
-        error
-      );
-    }
-  }
-
-  // ==========================================
-  // SAVE AD ACCOUNTS
-  // ==========================================
-
-  for (const account of adAccounts.data || []) {
-    const { error } = await supabase
-      .from("meta_ad_accounts")
-      .upsert(
-        {
-          meta_connection_id:
-            connection.id,
-          ad_account_id:
-            account.id,
-          ad_account_name:
-            account.name || null
-        },
-        {
-          onConflict:
-            "meta_connection_id,ad_account_id"
-        }
-      );
-
-    if (error) {
-      console.error(
-        "Ad account save error:",
-        error
-      );
-    }
-  }
-
-  // ==========================================
-  // SAVE FACEBOOK PAGES
-  // ==========================================
-
-  for (const page of pages.data || []) {
-    const { error } = await supabase
-      .from("meta_pages")
-      .upsert(
-        {
-          meta_connection_id:
-            connection.id,
-          page_id:
-            page.id,
-          page_name:
-            page.name || null
-        },
-        {
-          onConflict:
-            "meta_connection_id,page_id"
-        }
-      );
-
-    if (error) {
-      console.error(
-        "Page save error:",
-        error
-      );
-    }
-  }
-
-  return {
-    businesses:
-      businesses.data || [],
-
-    adAccounts:
-      adAccounts.data || [],
-
-    pages:
-      pages.data || []
-  };
+  return data;
 }
+
+/* =========================================================
+   GET META USER
+========================================================= */
+
+async function getMetaUser(accessToken) {
+  const data = await metaGraphRequest(
+    "/me?fields=id,name",
+    accessToken
+  );
+
+  return data;
+}
+
+/* =========================================================
+   SAVE META CONNECTION
+========================================================= */
 
 async function saveMetaConnection({
   metaUser,
@@ -266,35 +123,44 @@ async function saveMetaConnection({
     );
   }
 
-  // Check whether this Meta user already has a connection
-  const { data: existingConnection, error: findError } =
-    await supabase
-      .from("meta_connections")
-      .select("id, customer_id")
-      .eq("meta_user_id", metaUser.id)
-      .maybeSingle();
+  const {
+    data: existingConnection,
+    error: findError
+  } = await supabase
+    .from("meta_connections")
+    .select("id, customer_id")
+    .eq("meta_user_id", metaUser.id)
+    .maybeSingle();
 
   if (findError) {
     throw findError;
   }
 
-  let customerId;
+  /* =========================================
+     EXISTING CONNECTION
+  ========================================= */
 
   if (existingConnection) {
-    customerId = existingConnection.customer_id;
+    const { error: updateError } =
+      await supabase
+        .from("meta_connections")
+        .update({
+          access_token: accessToken,
 
-    const { error: updateError } = await supabase
-      .from("meta_connections")
-      .update({
-        access_token: accessToken,
-        token_expires_at: expiresIn
-          ? new Date(
-              Date.now() + expiresIn * 1000
-            ).toISOString()
-          : null,
-        updated_at: new Date().toISOString()
-      })
-      .eq("id", existingConnection.id);
+          token_expires_at: expiresIn
+            ? new Date(
+                Date.now() +
+                  expiresIn * 1000
+              ).toISOString()
+            : null,
+
+          updated_at:
+            new Date().toISOString()
+        })
+        .eq(
+          "id",
+          existingConnection.id
+        );
 
     if (updateError) {
       throw updateError;
@@ -307,38 +173,55 @@ async function saveMetaConnection({
     return existingConnection.id;
   }
 
-  // Create a ShopBoost customer for the first connection
-  const { data: customer, error: customerError } =
-    await supabase
-      .from("customers")
-      .insert({
-        name: metaUser.name || "Meta Customer"
-      })
-      .select("id")
-      .single();
+  /* =========================================
+     CREATE CUSTOMER
+  ========================================= */
+
+  const {
+    data: customer,
+    error: customerError
+  } = await supabase
+    .from("customers")
+    .insert({
+      name:
+        metaUser.name ||
+        "Meta Customer"
+    })
+    .select("id")
+    .single();
 
   if (customerError) {
     throw customerError;
   }
 
-  customerId = customer.id;
+  /* =========================================
+     CREATE META CONNECTION
+  ========================================= */
 
-  // Save Meta connection
-  const { data: connection, error: connectionError } =
-    await supabase
-      .from("meta_connections")
-      .insert({
-        customer_id: customerId,
-        meta_user_id: metaUser.id,
-        access_token: accessToken,
-        token_expires_at: expiresIn
+  const {
+    data: connection,
+    error: connectionError
+  } = await supabase
+    .from("meta_connections")
+    .insert({
+      customer_id: customer.id,
+
+      meta_user_id:
+        metaUser.id,
+
+      access_token:
+        accessToken,
+
+      token_expires_at:
+        expiresIn
           ? new Date(
-              Date.now() + expiresIn * 1000
+              Date.now() +
+                expiresIn * 1000
             ).toISOString()
           : null
-      })
-      .select("id")
-      .single();
+    })
+    .select("id")
+    .single();
 
   if (connectionError) {
     throw connectionError;
@@ -350,6 +233,313 @@ async function saveMetaConnection({
 
   return connection.id;
 }
+
+/* =========================================================
+   SYNC META BUSINESSES / AD ACCOUNTS / PAGES / INSTAGRAM
+========================================================= */
+
+async function getMetaAssets(connectionId) {
+  if (!supabase) {
+    throw new Error(
+      "Supabase environment variables are missing"
+    );
+  }
+
+  /* =========================================
+     GET CONNECTION
+  ========================================= */
+
+  const {
+    data: connection,
+    error: connectionError
+  } = await supabase
+    .from("meta_connections")
+    .select(
+      "id, customer_id, meta_user_id, access_token"
+    )
+    .eq("id", connectionId)
+    .single();
+
+  if (connectionError || !connection) {
+    throw new Error(
+      "Meta connection was not found"
+    );
+  }
+
+  const accessToken =
+    connection.access_token;
+
+  if (!accessToken) {
+    throw new Error(
+      "Meta access token is missing"
+    );
+  }
+
+  console.log(
+    "🔄 Fetching Meta businesses..."
+  );
+
+  /* =========================================
+     BUSINESSES
+  ========================================= */
+
+  const businesses =
+    await metaGraphRequest(
+      "/me/businesses?fields=id,name&limit=100",
+      accessToken
+    );
+
+  console.log(
+    `✅ Businesses found: ${
+      (businesses.data || []).length
+    }`
+  );
+
+  /* =========================================
+     AD ACCOUNTS
+  ========================================= */
+
+  console.log(
+    "🔄 Fetching Meta ad accounts..."
+  );
+
+  const adAccounts =
+    await metaGraphRequest(
+      
+"/me/adaccounts?fields=id,name,account_status,currency,account_id&limit=100",
+      accessToken
+    );
+
+  console.log(
+    `✅ Ad accounts found: ${
+      (adAccounts.data || []).length
+    }`
+  );
+
+  /* =========================================
+     FACEBOOK PAGES
+  ========================================= */
+
+  console.log(
+    "🔄 Fetching Facebook pages..."
+  );
+
+  const pages =
+    await metaGraphRequest(
+      "/me/accounts?fields=id,name&limit=100",
+      accessToken
+    );
+
+  console.log(
+    `✅ Facebook pages found: ${
+      (pages.data || []).length
+    }`
+  );
+
+  /* =========================================
+     SAVE BUSINESSES
+  ========================================= */
+
+  for (
+    const business of
+    businesses.data || []
+  ) {
+    const {
+      error
+    } = await supabase
+      .from("meta_businesses")
+      .upsert(
+        {
+          meta_connection_id:
+            connection.id,
+
+          business_id:
+            business.id,
+
+          business_name:
+            business.name || null
+        },
+        {
+          onConflict:
+            "meta_connection_id,business_id"
+        }
+      );
+
+    if (error) {
+      console.error(
+        "❌ Business save error:",
+        error
+      );
+    }
+  }
+
+  /* =========================================
+     SAVE AD ACCOUNTS
+  ========================================= */
+
+  for (
+    const account of
+    adAccounts.data || []
+  ) {
+    const {
+      error
+    } = await supabase
+      .from("meta_ad_accounts")
+      .upsert(
+        {
+          meta_connection_id:
+            connection.id,
+
+          ad_account_id:
+            account.id,
+
+          ad_account_name:
+            account.name || null
+        },
+        {
+          onConflict:
+            "meta_connection_id,ad_account_id"
+        }
+      );
+
+    if (error) {
+      console.error(
+        "❌ Ad account save error:",
+        error
+      );
+    }
+  }
+
+  /* =========================================
+     SAVE FACEBOOK PAGES
+  ========================================= */
+
+  for (
+    const page of
+    pages.data || []
+  ) {
+    const {
+      error
+    } = await supabase
+      .from("meta_pages")
+      .upsert(
+        {
+          meta_connection_id:
+            connection.id,
+
+          page_id:
+            page.id,
+
+          page_name:
+            page.name || null
+        },
+        {
+          onConflict:
+            "meta_connection_id,page_id"
+        }
+      );
+
+    if (error) {
+      console.error(
+        "❌ Page save error:",
+        error
+      );
+    }
+  }
+
+  /* =========================================
+     INSTAGRAM BUSINESS ACCOUNTS
+  ========================================= */
+
+  console.log(
+    "🔄 Fetching Instagram accounts..."
+  );
+
+  const instagramAccounts = [];
+
+  for (
+    const page of
+    pages.data || []
+  ) {
+    try {
+      const pageData =
+        await metaGraphRequest(
+          `/${page.id}?fields=instagram_business_account{id,username}`,
+          accessToken
+        );
+
+      const instagram =
+        pageData.instagram_business_account;
+
+      if (!instagram) {
+        continue;
+      }
+
+      instagramAccounts.push({
+        id: instagram.id,
+        username:
+          instagram.username || null,
+        pageId: page.id
+      });
+
+      const {
+        error
+      } = await supabase
+        .from(
+          "meta_instagram_accounts"
+        )
+        .upsert(
+          {
+            meta_connection_id:
+              connection.id,
+
+            instagram_id:
+              instagram.id,
+
+            username:
+              instagram.username ||
+              null
+          },
+          {
+            onConflict:
+              "meta_connection_id,instagram_id"
+          }
+        );
+
+      if (error) {
+        console.error(
+          "❌ Instagram save error:",
+          error
+        );
+      }
+    } catch (error) {
+      console.log(
+        `ℹ️ No Instagram business account for page ${page.id}`
+      );
+    }
+  }
+
+  console.log(
+    `✅ Instagram accounts found: ${instagramAccounts.length}`
+  );
+
+  return {
+    businesses:
+      businesses.data || [],
+
+    adAccounts:
+      adAccounts.data || [],
+
+    pages:
+      pages.data || [],
+
+    instagramAccounts
+  };
+}
+
+/* =========================================================
+   HTTP SERVER
+========================================================= */
 
 const server = http.createServer(
   async (req, res) => {
@@ -374,9 +564,9 @@ const server = http.createServer(
       return;
     }
 
-    // ==========================================
-    // META OAUTH CALLBACK
-    // ==========================================
+    /* =========================================
+       META OAUTH CALLBACK
+    ========================================= */
 
     if (
       req.url.startsWith(
@@ -390,10 +580,14 @@ const server = http.createServer(
         );
 
         const code =
-          url.searchParams.get("code");
+          url.searchParams.get(
+            "code"
+          );
 
         const error =
-          url.searchParams.get("error");
+          url.searchParams.get(
+            "error"
+          );
 
         const errorDescription =
           url.searchParams.get(
@@ -436,9 +630,14 @@ const server = http.createServer(
           "✅ Meta authorization code received"
         );
 
-        // Exchange authorization code for access token
+        /* =====================================
+           EXCHANGE CODE FOR TOKEN
+        ===================================== */
+
         const tokenData =
-          await exchangeMetaCode(code);
+          await exchangeMetaCode(
+            code
+          );
 
         const accessToken =
           tokenData.access_token;
@@ -456,9 +655,14 @@ const server = http.createServer(
           "✅ Meta access token received"
         );
 
-        // Get Meta user information
+        /* =====================================
+           GET META USER
+        ===================================== */
+
         const metaUser =
-          await getMetaUser(accessToken);
+          await getMetaUser(
+            accessToken
+          );
 
         console.log(
           "✅ Meta user:",
@@ -466,7 +670,10 @@ const server = http.createServer(
           metaUser.name
         );
 
-        // Save customer + connection
+        /* =====================================
+           SAVE CUSTOMER + CONNECTION
+        ===================================== */
+
         const connectionId =
           await saveMetaConnection({
             metaUser,
@@ -479,27 +686,40 @@ const server = http.createServer(
           connectionId
         );
 
-        // Sync Meta business, ad account and Facebook Page assets.
-        // Instagram is intentionally not included here.
-        try {
-          const metaAssets =
-            await getMetaAssets(connectionId);
+        /* =====================================
+           SYNC META ASSETS
+        ===================================== */
 
-          console.log(
-            "✅ Meta assets synced:",
-            "Businesses:",
-            metaAssets.businesses.length,
-            "Ad Accounts:",
-            metaAssets.adAccounts.length,
-            "Facebook Pages:",
-            metaAssets.pages.length
+        console.log(
+          "🔄 Syncing Meta assets..."
+        );
+
+        const metaAssets =
+          await getMetaAssets(
+            connectionId
           );
-        } catch (assetError) {
-          console.error(
-            "❌ Meta asset sync failed:",
-            assetError
-          );
-        }
+
+        console.log(
+          "✅ Meta assets synced:",
+          {
+            businesses:
+              metaAssets.businesses.length,
+
+            adAccounts:
+              metaAssets.adAccounts.length,
+
+            pages:
+              metaAssets.pages.length,
+
+            instagramAccounts:
+              metaAssets.instagramAccounts
+                .length
+          }
+        );
+
+        /* =====================================
+           SUCCESS PAGE
+        ===================================== */
 
         res.writeHead(200);
 
@@ -507,7 +727,9 @@ const server = http.createServer(
           <!DOCTYPE html>
 
           <html>
+
           <head>
+
             <title>Meta Connected</title>
 
             <meta
@@ -516,28 +738,72 @@ const server = http.createServer(
             />
 
             <style>
+
               body {
-                font-family: Arial, sans-serif;
-                text-align: center;
-                padding: 60px 20px;
-                background: #f5f7fb;
+                font-family:
+                  Arial,
+                  sans-serif;
+
+                text-align:
+                  center;
+
+                padding:
+                  60px 20px;
+
+                background:
+                  #f5f7fb;
               }
 
               .card {
-                max-width: 450px;
-                margin: auto;
-                background: white;
-                padding: 40px;
-                border-radius: 20px;
+                max-width:
+                  480px;
+
+                margin:
+                  auto;
+
+                background:
+                  white;
+
+                padding:
+                  40px;
+
+                border-radius:
+                  20px;
+
                 box-shadow:
                   0 10px 40px
                   rgba(0,0,0,.1);
               }
 
               h1 {
-                color: #1877f2;
+                color:
+                  #1877f2;
               }
+
+              .stats {
+                margin-top:
+                  25px;
+
+                text-align:
+                  left;
+
+                background:
+                  #f5f7fb;
+
+                padding:
+                  20px;
+
+                border-radius:
+                  12px;
+              }
+
+              .stats p {
+                margin:
+                  8px 0;
+              }
+
             </style>
+
           </head>
 
           <body>
@@ -558,6 +824,38 @@ const server = http.createServer(
                 saved securely.
               </p>
 
+              <div class="stats">
+
+                <p>
+                  🏢 Businesses:
+                  <strong>
+                    ${metaAssets.businesses.length}
+                  </strong>
+                </p>
+
+                <p>
+                  💰 Ad Accounts:
+                  <strong>
+                    ${metaAssets.adAccounts.length}
+                  </strong>
+                </p>
+
+                <p>
+                  📘 Facebook Pages:
+                  <strong>
+                    ${metaAssets.pages.length}
+                  </strong>
+                </p>
+
+                <p>
+                  📸 Instagram Accounts:
+                  <strong>
+                    ${metaAssets.instagramAccounts.length}
+                  </strong>
+                </p>
+
+              </div>
+
               <p>
                 You can now return to
                 ShopBoost AI.
@@ -566,6 +864,7 @@ const server = http.createServer(
             </div>
 
           </body>
+
           </html>
         `);
 
@@ -580,19 +879,39 @@ const server = http.createServer(
         res.writeHead(500);
 
         res.end(`
-          <h2>❌ Meta Connection Failed</h2>
-          <p>
-            ${error.message}
-          </p>
+          <!DOCTYPE html>
+
+          <html>
+
+          <head>
+            <title>Meta Connection Failed</title>
+          </head>
+
+          <body>
+
+            <h2>
+              ❌ Meta Connection Failed
+            </h2>
+
+            <p>
+              ${
+                error.message ||
+                "Unknown error"
+              }
+            </p>
+
+          </body>
+
+          </html>
         `);
 
         return;
       }
     }
 
-    // ==========================================
-    // LOCATION SEARCH API
-    // ==========================================
+    /* =========================================
+       LOCATION SEARCH API
+    ========================================= */
 
     if (
       req.url.startsWith(
@@ -605,9 +924,14 @@ const server = http.createServer(
       );
 
       const query =
-        url.searchParams.get("q")?.trim();
+        url.searchParams
+          .get("q")
+          ?.trim();
 
-      if (!query || query.length < 2) {
+      if (
+        !query ||
+        query.length < 2
+      ) {
         res.writeHead(400, {
           "Content-Type":
             "application/json"
@@ -623,10 +947,12 @@ const server = http.createServer(
         return;
       }
 
-      const now = Date.now();
+      const now =
+        Date.now();
 
       if (
-        now - lastSearchTime <
+        now -
+          lastSearchTime <
         1100
       ) {
         res.writeHead(429, {
@@ -644,26 +970,38 @@ const server = http.createServer(
         return;
       }
 
-      lastSearchTime = now;
+      lastSearchTime =
+        now;
 
       try {
         const apiUrl =
           "https://nominatim.openstreetmap.org/search?" +
           new URLSearchParams({
             q: query,
-            format: "jsonv2",
-            addressdetails: "1",
-            limit: "8",
-            countrycodes: "in"
+
+            format:
+              "jsonv2",
+
+            addressdetails:
+              "1",
+
+            limit:
+              "8",
+
+            countrycodes:
+              "in"
           });
 
         const response =
-          await fetch(apiUrl, {
-            headers: {
-              "User-Agent":
-                "ShopBoost-AI/1.0 location-search"
+          await fetch(
+            apiUrl,
+            {
+              headers: {
+                "User-Agent":
+                  "ShopBoost-AI/1.0 location-search"
+              }
             }
-          });
+          );
 
         if (!response.ok) {
           throw new Error(
@@ -674,46 +1012,48 @@ const server = http.createServer(
         const data =
           await response.json();
 
-        const results = data.map(
-          (place) => ({
-            id: `${place.osm_type}-${place.osm_id}`,
+        const results =
+          data.map(
+            (place) => ({
+              id:
+                `${place.osm_type}-${place.osm_id}`,
 
-            name:
-              place.name ||
-              place.address?.city ||
-              place.address?.town ||
-              place.address?.village ||
-              place.display_name.split(
-                ","
-              )[0],
+              name:
+                place.name ||
+                place.address?.city ||
+                place.address?.town ||
+                place.address?.village ||
+                place.display_name
+                  .split(",")[0],
 
-            displayName:
-              place.display_name,
+              displayName:
+                place.display_name,
 
-            latitude:
-              Number(place.lat),
+              latitude:
+                Number(place.lat),
 
-            longitude:
-              Number(place.lon),
+              longitude:
+                Number(place.lon),
 
-            type: place.type,
+              type:
+                place.type,
 
-            city:
-              place.address?.city ||
-              place.address?.town ||
-              place.address?.village ||
-              place.address?.municipality ||
-              "",
+              city:
+                place.address?.city ||
+                place.address?.town ||
+                place.address?.village ||
+                place.address?.municipality ||
+                "",
 
-            state:
-              place.address?.state ||
-              "",
+              state:
+                place.address?.state ||
+                "",
 
-            country:
-              place.address?.country ||
-              "India"
-          })
-        );
+              country:
+                place.address?.country ||
+                "India"
+            })
+          );
 
         res.writeHead(200, {
           "Content-Type":
@@ -721,11 +1061,15 @@ const server = http.createServer(
         });
 
         res.end(
-          JSON.stringify(results)
+          JSON.stringify(
+            results
+          )
         );
 
       } catch (error) {
-        console.error(error);
+        console.error(
+          error
+        );
 
         res.writeHead(500, {
           "Content-Type":
@@ -743,9 +1087,9 @@ const server = http.createServer(
       return;
     }
 
-    // ==========================================
-    // HEALTH CHECK
-    // ==========================================
+    /* =========================================
+       HEALTH CHECK
+    ========================================= */
 
     if (req.url === "/") {
       res.writeHead(200, {
@@ -755,12 +1099,16 @@ const server = http.createServer(
 
       res.end(
         JSON.stringify({
-          status: "ok",
+          status:
+            "ok",
+
           service:
             "ShopBoost AI Backend",
+
           metaCallback:
             "/auth/meta/callback",
-          supabase:
+
+          supabaseConfigured:
             Boolean(supabase)
         })
       );
@@ -768,18 +1116,24 @@ const server = http.createServer(
       return;
     }
 
-    // ==========================================
-    // 404
-    // ==========================================
+    /* =========================================
+       404
+    ========================================= */
 
     res.writeHead(404, {
       "Content-Type":
         "text/plain"
     });
 
-    res.end("Not Found");
+    res.end(
+      "Not Found"
+    );
   }
 );
+
+/* =========================================================
+   START SERVER
+========================================================= */
 
 server.listen(
   PORT,
@@ -794,9 +1148,7 @@ server.listen(
     );
 
     console.log(
-      `🗄️ Supabase configured: ${Boolean(
-        supabase
-      )}`
+      `🗄️ Supabase configured: ${Boolean(supabase)}`
     );
   }
 );

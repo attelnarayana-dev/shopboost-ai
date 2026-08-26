@@ -81,6 +81,34 @@ function AudienceTargeting() {
         <div className="audience-ai-badge">
           🧠 AI Powered
         </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            const appId = "1852755615887763";
+            const redirectUri =
+              "https://shopboost-ai-backend.onrender.com/auth/meta/callback";
+
+            const scope = [
+              "business_management",
+              "pages_show_list",
+              "pages_read_engagement",
+              "ads_read",
+              "ads_management"
+            ].join(",");
+
+            const metaUrl =
+              `https://www.facebook.com/v25.0/dialog/oauth` +
+              `?client_id=${encodeURIComponent(appId)}` +
+              `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+              `&scope=${encodeURIComponent(scope)}` +
+              `&response_type=code`;
+
+            window.location.href = metaUrl;
+          }}
+        >
+          🔵 Connect Meta
+        </button>
       </div>
 
       <div className="audience-recommendation">

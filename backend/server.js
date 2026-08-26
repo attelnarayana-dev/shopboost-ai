@@ -1,306 +1,599 @@
 const http = require("http");
+const { createClient } = require("@supabase/supabase-js");
 
 const PORT = process.env.PORT || 8787;
+const HOST = "0.0.0.0";
+
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+const META_APP_ID = process.env.META_APP_ID;
+const META_APP_SECRET = process.env.META_APP_SECRET;
+const META_REDIRECT_URI =
+  process.env.META_REDIRECT_URI ||
+  "https://shopboost-ai-backend.onrender.com/auth/meta/callback";
+
+const supabase =
+  SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
+    ? createClient(
+        SUPABASE_URL,
+        SUPABASE_SERVICE_ROLE_KEY
+      )
+    : null;
 
 let lastSearchTime = 0;
 
-const server = http.createServer(async (req, res) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+async function exchangeMetaCode(code) {
+  const tokenUrl =
+    "https://graph.facebook.com/v25.0/oauth/access_token?" +
+    new URLSearchParams({
+      client_id: META_APP_ID,
+      client_secret: META_APP_SECRET,
+      redirect_uri: META_REDIRECT_URI,
+      code
+    });
 
-  if (req.method === "OPTIONS") {
-    res.writeHead(204);
-    res.end();
-    return;
+  const response = await fetch(tokenUrl);
+
+  const data = await response.json();
+
+  if (!response.ok || data.error) {
+    console.error("Meta token exchange failed:", data);
+
+    throw new Error(
+      data.error?.message ||
+        "Unable to exchange Meta authorization code"
+    );
   }
 
-  // --------------------------------------------------
-  // META OAUTH CALLBACK
-  // --------------------------------------------------
+  return data;
+}
 
-  if (req.url.startsWith("/auth/meta/callback")) {
-    const url = new URL(req.url, `http://localhost:${PORT}`);
+async function getMetaUser(accessToken) {
+  const response = await fetch(
+    "https://graph.facebook.com/v25.0/me?fields=id,name",
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    }
+  );
 
-    const code = url.searchParams.get("code");
-    const error = url.searchParams.get("error");
-    const errorDescription =
-      url.searchParams.get("error_description");
+  const data = await response.json();
+
+  if (!response.ok || data.error) {
+    console.error("Meta user request failed:", data);
+
+    throw new Error(
+      data.error?.message ||
+        "Unable to retrieve Meta user"
+    );
+  }
+
+  return data;
+}
+
+async function saveMetaConnection({
+  metaUser,
+  accessToken,
+  expiresIn
+}) {
+  if (!supabase) {
+    throw new Error(
+      "Supabase environment variables are missing"
+    );
+  }
+
+  // Check whether this Meta user already has a connection
+  const { data: existingConnection, error: findError } =
+    await supabase
+      .from("meta_connections")
+      .select("id, customer_id")
+      .eq("meta_user_id", metaUser.id)
+      .maybeSingle();
+
+  if (findError) {
+    throw findError;
+  }
+
+  let customerId;
+
+  if (existingConnection) {
+    customerId = existingConnection.customer_id;
+
+    const { error: updateError } = await supabase
+      .from("meta_connections")
+      .update({
+        access_token: accessToken,
+        token_expires_at: expiresIn
+          ? new Date(
+              Date.now() + expiresIn * 1000
+            ).toISOString()
+          : null,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", existingConnection.id);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    console.log(
+      "✅ Existing Meta connection updated"
+    );
+
+    return existingConnection.id;
+  }
+
+  // Create a ShopBoost customer for the first connection
+  const { data: customer, error: customerError } =
+    await supabase
+      .from("customers")
+      .insert({
+        name: metaUser.name || "Meta Customer"
+      })
+      .select("id")
+      .single();
+
+  if (customerError) {
+    throw customerError;
+  }
+
+  customerId = customer.id;
+
+  // Save Meta connection
+  const { data: connection, error: connectionError } =
+    await supabase
+      .from("meta_connections")
+      .insert({
+        customer_id: customerId,
+        meta_user_id: metaUser.id,
+        access_token: accessToken,
+        token_expires_at: expiresIn
+          ? new Date(
+              Date.now() + expiresIn * 1000
+            ).toISOString()
+          : null
+      })
+      .select("id")
+      .single();
+
+  if (connectionError) {
+    throw connectionError;
+  }
+
+  console.log(
+    "✅ New customer + Meta connection saved"
+  );
+
+  return connection.id;
+}
+
+const server = http.createServer(
+  async (req, res) => {
+    res.setHeader(
+      "Access-Control-Allow-Origin",
+      "*"
+    );
 
     res.setHeader(
-      "Content-Type",
-      "text/html; charset=utf-8"
+      "Access-Control-Allow-Methods",
+      "GET, OPTIONS"
     );
 
-    if (error) {
-      console.error("❌ Meta OAuth error:", error);
-      console.error(
-        "Description:",
-        errorDescription || "Unknown error"
-      );
+    res.setHeader(
+      "Access-Control-Allow-Headers",
+      "Content-Type"
+    );
 
-      res.writeHead(400);
+    if (req.method === "OPTIONS") {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
 
-      res.end(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta charset="UTF-8" />
-            <title>Meta Login Failed</title>
-          </head>
-          <body>
+    // ==========================================
+    // META OAUTH CALLBACK
+    // ==========================================
+
+    if (
+      req.url.startsWith(
+        "/auth/meta/callback"
+      )
+    ) {
+      try {
+        const url = new URL(
+          req.url,
+          `http://${req.headers.host}`
+        );
+
+        const code =
+          url.searchParams.get("code");
+
+        const error =
+          url.searchParams.get("error");
+
+        const errorDescription =
+          url.searchParams.get(
+            "error_description"
+          );
+
+        res.setHeader(
+          "Content-Type",
+          "text/html; charset=utf-8"
+        );
+
+        if (error) {
+          res.writeHead(400);
+
+          res.end(`
             <h2>❌ Meta Login Failed</h2>
             <p>${error}</p>
-            <p>${errorDescription || ""}</p>
-          </body>
-        </html>
-      `);
+            ${
+              errorDescription
+                ? `<p>${errorDescription}</p>`
+                : ""
+            }
+          `);
 
-      return;
-    }
+          return;
+        }
 
-    if (!code) {
-      console.log("⚠️ Meta callback reached without code");
+        if (!code) {
+          res.writeHead(400);
 
-      res.writeHead(400);
-
-      res.end(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta charset="UTF-8" />
-            <title>Meta Callback</title>
-          </head>
-          <body>
-            <h2>⚠️ Meta Callback Reached</h2>
+          res.end(`
+            <h2>❌ Meta Callback Error</h2>
             <p>No authorization code was received.</p>
+          `);
+
+          return;
+        }
+
+        console.log(
+          "✅ Meta authorization code received"
+        );
+
+        // Exchange authorization code for access token
+        const tokenData =
+          await exchangeMetaCode(code);
+
+        const accessToken =
+          tokenData.access_token;
+
+        const expiresIn =
+          tokenData.expires_in;
+
+        if (!accessToken) {
+          throw new Error(
+            "Meta did not return an access token"
+          );
+        }
+
+        console.log(
+          "✅ Meta access token received"
+        );
+
+        // Get Meta user information
+        const metaUser =
+          await getMetaUser(accessToken);
+
+        console.log(
+          "✅ Meta user:",
+          metaUser.id,
+          metaUser.name
+        );
+
+        // Save customer + connection
+        const connectionId =
+          await saveMetaConnection({
+            metaUser,
+            accessToken,
+            expiresIn
+          });
+
+        console.log(
+          "✅ Meta connection saved:",
+          connectionId
+        );
+
+        res.writeHead(200);
+
+        res.end(`
+          <!DOCTYPE html>
+
+          <html>
+          <head>
+            <title>Meta Connected</title>
+
+            <meta
+              name="viewport"
+              content="width=device-width, initial-scale=1"
+            />
+
+            <style>
+              body {
+                font-family: Arial, sans-serif;
+                text-align: center;
+                padding: 60px 20px;
+                background: #f5f7fb;
+              }
+
+              .card {
+                max-width: 450px;
+                margin: auto;
+                background: white;
+                padding: 40px;
+                border-radius: 20px;
+                box-shadow:
+                  0 10px 40px
+                  rgba(0,0,0,.1);
+              }
+
+              h1 {
+                color: #1877f2;
+              }
+            </style>
+          </head>
+
+          <body>
+
+            <div class="card">
+
+              <h1>
+                ✅ Meta Connected
+              </h1>
+
+              <p>
+                Meta account connected
+                successfully.
+              </p>
+
+              <p>
+                Customer connection has been
+                saved securely.
+              </p>
+
+              <p>
+                You can now return to
+                ShopBoost AI.
+              </p>
+
+            </div>
+
           </body>
-        </html>
-      `);
+          </html>
+        `);
 
-      return;
+        return;
+
+      } catch (error) {
+        console.error(
+          "❌ Meta OAuth error:",
+          error
+        );
+
+        res.writeHead(500);
+
+        res.end(`
+          <h2>❌ Meta Connection Failed</h2>
+          <p>
+            ${error.message}
+          </p>
+        `);
+
+        return;
+      }
     }
 
-    console.log("✅ Meta authorization code received");
-    console.log("Code received:", code.substring(0, 12) + "...");
+    // ==========================================
+    // LOCATION SEARCH API
+    // ==========================================
 
-    res.writeHead(200);
-
-    res.end(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="UTF-8" />
-          <meta name="viewport" content="width=device-width, 
-initial-scale=1.0" />
-          <title>ShopBoost AI - Meta Connected</title>
-
-          <style>
-            body {
-              margin: 0;
-              min-height: 100vh;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              background: #050505;
-              color: white;
-              font-family: Arial, sans-serif;
-            }
-
-            .card {
-              width: min(90%, 520px);
-              padding: 40px;
-              border: 1px solid rgba(255,255,255,.15);
-              border-radius: 24px;
-              background: #111;
-              text-align: center;
-              box-shadow: 0 20px 60px rgba(0,0,0,.5);
-            }
-
-            h1 {
-              margin-bottom: 12px;
-            }
-
-            p {
-              color: #aaa;
-              line-height: 1.6;
-            }
-
-            .success {
-              font-size: 52px;
-            }
-          </style>
-        </head>
-
-        <body>
-          <div class="card">
-            <div class="success">✅</div>
-
-            <h1>Meta Connected</h1>
-
-            <p>
-              ShopBoost AI successfully received the
-              Meta authorization callback.
-            </p>
-
-            <p>
-              Authorization code received successfully.
-            </p>
-          </div>
-        </body>
-      </html>
-    `);
-
-    return;
-  }
-
-  // --------------------------------------------------
-  // LOCATION SEARCH
-  // --------------------------------------------------
-
-  if (req.url.startsWith("/api/locations/search")) {
-    const url = new URL(
-      req.url,
-      `http://localhost:${PORT}`
-    );
-
-    const query = url.searchParams.get("q")?.trim();
-
-    if (!query || query.length < 2) {
-      res.writeHead(400, {
-        "Content-Type": "application/json"
-      });
-
-      res.end(
-        JSON.stringify({
-          error: "Search query is required"
-        })
+    if (
+      req.url.startsWith(
+        "/api/locations/search"
+      )
+    ) {
+      const url = new URL(
+        req.url,
+        `http://${req.headers.host}`
       );
 
-      return;
-    }
+      const query =
+        url.searchParams.get("q")?.trim();
 
-    const now = Date.now();
-
-    if (now - lastSearchTime < 1100) {
-      res.writeHead(429, {
-        "Content-Type": "application/json"
-      });
-
-      res.end(
-        JSON.stringify({
-          error:
-            "Please wait a moment before searching again."
-        })
-      );
-
-      return;
-    }
-
-    lastSearchTime = now;
-
-    try {
-      const apiUrl =
-        "https://nominatim.openstreetmap.org/search?" +
-        new URLSearchParams({
-          q: query,
-          format: "jsonv2",
-          addressdetails: "1",
-          limit: "8",
-          countrycodes: "in"
+      if (!query || query.length < 2) {
+        res.writeHead(400, {
+          "Content-Type":
+            "application/json"
         });
 
-      const response = await fetch(apiUrl, {
-        headers: {
-          "User-Agent":
-            "ShopBoost-AI/1.0 location-search"
-        }
-      });
+        res.end(
+          JSON.stringify({
+            error:
+              "Search query is required"
+          })
+        );
 
-      if (!response.ok) {
-        throw new Error(
-          `Location API returned ${response.status}`
+        return;
+      }
+
+      const now = Date.now();
+
+      if (
+        now - lastSearchTime <
+        1100
+      ) {
+        res.writeHead(429, {
+          "Content-Type":
+            "application/json"
+        });
+
+        res.end(
+          JSON.stringify({
+            error:
+              "Please wait a moment before searching again."
+          })
+        );
+
+        return;
+      }
+
+      lastSearchTime = now;
+
+      try {
+        const apiUrl =
+          "https://nominatim.openstreetmap.org/search?" +
+          new URLSearchParams({
+            q: query,
+            format: "jsonv2",
+            addressdetails: "1",
+            limit: "8",
+            countrycodes: "in"
+          });
+
+        const response =
+          await fetch(apiUrl, {
+            headers: {
+              "User-Agent":
+                "ShopBoost-AI/1.0 location-search"
+            }
+          });
+
+        if (!response.ok) {
+          throw new Error(
+            `Location API returned ${response.status}`
+          );
+        }
+
+        const data =
+          await response.json();
+
+        const results = data.map(
+          (place) => ({
+            id: `${place.osm_type}-${place.osm_id}`,
+
+            name:
+              place.name ||
+              place.address?.city ||
+              place.address?.town ||
+              place.address?.village ||
+              place.display_name.split(
+                ","
+              )[0],
+
+            displayName:
+              place.display_name,
+
+            latitude:
+              Number(place.lat),
+
+            longitude:
+              Number(place.lon),
+
+            type: place.type,
+
+            city:
+              place.address?.city ||
+              place.address?.town ||
+              place.address?.village ||
+              place.address?.municipality ||
+              "",
+
+            state:
+              place.address?.state ||
+              "",
+
+            country:
+              place.address?.country ||
+              "India"
+          })
+        );
+
+        res.writeHead(200, {
+          "Content-Type":
+            "application/json"
+        });
+
+        res.end(
+          JSON.stringify(results)
+        );
+
+      } catch (error) {
+        console.error(error);
+
+        res.writeHead(500, {
+          "Content-Type":
+            "application/json"
+        });
+
+        res.end(
+          JSON.stringify({
+            error:
+              "Unable to search locations"
+          })
         );
       }
 
-      const data = await response.json();
+      return;
+    }
 
-      const results = data.map((place) => ({
-        id: `${place.osm_type}-${place.osm_id}`,
+    // ==========================================
+    // HEALTH CHECK
+    // ==========================================
 
-        name:
-          place.name ||
-          place.address?.city ||
-          place.address?.town ||
-          place.address?.village ||
-          place.display_name.split(",")[0],
-
-        displayName: place.display_name,
-
-        latitude: Number(place.lat),
-
-        longitude: Number(place.lon),
-
-        type: place.type,
-
-        city:
-          place.address?.city ||
-          place.address?.town ||
-          place.address?.village ||
-          place.address?.municipality ||
-          "",
-
-        state:
-          place.address?.state || "",
-
-        country:
-          place.address?.country || "India"
-      }));
-
+    if (req.url === "/") {
       res.writeHead(200, {
-        "Content-Type": "application/json"
-      });
-
-      res.end(JSON.stringify(results));
-
-    } catch (error) {
-      console.error(error);
-
-      res.writeHead(500, {
-        "Content-Type": "application/json"
+        "Content-Type":
+          "application/json"
       });
 
       res.end(
         JSON.stringify({
-          error: "Unable to search locations"
+          status: "ok",
+          service:
+            "ShopBoost AI Backend",
+          metaCallback:
+            "/auth/meta/callback",
+          supabase:
+            Boolean(supabase)
         })
       );
+
+      return;
     }
 
-    return;
+    // ==========================================
+    // 404
+    // ==========================================
+
+    res.writeHead(404, {
+      "Content-Type":
+        "text/plain"
+    });
+
+    res.end("Not Found");
   }
+);
 
-  // --------------------------------------------------
-  // NOT FOUND
-  // --------------------------------------------------
+server.listen(
+  PORT,
+  HOST,
+  () => {
+    console.log(
+      `📍 ShopBoost AI Backend running on ${HOST}:${PORT}`
+    );
 
-  res.writeHead(404, {
-    "Content-Type": "text/plain"
-  });
+    console.log(
+      `🔐 Meta OAuth callback: ${META_REDIRECT_URI}`
+    );
 
-  res.end("Not Found");
-});
-
-// --------------------------------------------------
-// START SERVER
-// --------------------------------------------------
-
-server.listen(PORT, "0.0.0.0", () => {
-  console.log(
-    `📍 Location API running at http://localhost:${PORT}`
-  );
-
-  console.log(
-    `🔐 Meta OAuth callback: http://localhost:${PORT}/auth/meta/callback`
-  );
-});
+    console.log(
+      `🗄️ Supabase configured: ${Boolean(
+        supabase
+      )}`
+    );
+  }
+);
